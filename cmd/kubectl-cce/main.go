@@ -37,6 +37,8 @@ var unsupportedStreamingCommands = map[string]bool{
 	"port-forward": true,
 }
 
+var version = "dev"
+
 type config struct {
 	clusterID     string
 	region        string
@@ -52,7 +54,7 @@ type config struct {
 }
 
 func main() {
-	if err := run(os.Args[1:]); err != nil {
+	if err := run(os.Args[1:], os.Stdout); err != nil {
 		var exitErr kubectlExitError
 		if errors.As(err, &exitErr) {
 			os.Exit(exitErr.code)
@@ -62,7 +64,7 @@ func main() {
 	}
 }
 
-func run(args []string) error {
+func run(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("kubectl cce", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	printProxyURL := fs.Bool("print-proxy-url", false, "print a temporary local proxy URL and exit")
@@ -72,8 +74,13 @@ func run(args []string) error {
 	region := fs.String("region", "", "Huawei Cloud region; overrides CCE_REGION")
 	endpoint := fs.String("endpoint", "", "CCE API Gateway endpoint host; overrides CCE_ENDPOINT")
 	projectID := fs.String("project-id", "", "Huawei Cloud project ID; overrides CCE_PROJECT_ID")
+	showVersion := fs.Bool("version", false, "print the kubectl-cce version and exit")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *showVersion {
+		fmt.Fprintln(stdout, version)
+		return nil
 	}
 
 	cfg := loadConfig()
@@ -418,11 +425,40 @@ func canonicalHeaders(req *http.Request, signerHeaders string) string {
 	return b.String()
 }
 
+func tempKubeconfigPath() (string, func(), error) {
+	f, err := os.CreateTemp("", "kubectl-cce-kubeconfig-*")
+	if err != nil {
+		return "", nil, err
+	}
+	if _, err := f.WriteString("apiVersion: v1\nkind: Config\n"); err != nil {
+		f.Close()
+		os.Remove(f.Name())
+		return "", nil, err
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(f.Name())
+		return "", nil, err
+	}
+	path := f.Name()
+	cleanup := func() {
+		if err := os.Remove(path); err != nil && os.Getenv("CCE_PROXY_DEBUG") != "" {
+			fmt.Fprintf(os.Stderr, "kubectl-cce: failed to remove temp kubeconfig %s: %v\n", path, err)
+		}
+	}
+	return path, cleanup, nil
+}
+
 func runKubectlThroughProxy(proxy *localProxy, cfg config, kubectlArgs []string) error {
+	kubeconfigPath, cleanup, err := tempKubeconfigPath()
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
 	args := append([]string{
 		"--server=" + proxy.url(),
 		"--insecure-skip-tls-verify=true",
-		"--kubeconfig=/dev/null",
+		"--kubeconfig=" + kubeconfigPath,
 	}, kubectlArgs...)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
