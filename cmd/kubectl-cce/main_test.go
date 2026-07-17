@@ -117,3 +117,21 @@ func TestTempKubeconfigValidAndCrossPlatform(t *testing.T) {
 		t.Fatalf("cleanup did not remove %s: %v", path, err)
 	}
 }
+
+func TestEnvDefaultAliases(t *testing.T) {
+	t.Setenv("HW_REGION", "")
+	t.Setenv("HUAWEICLOUD_REGION", "")
+	t.Setenv("HUAWEI_CLOUD_REGION", "")
+	if got := envDefaultAliases("cn-north-4", "HW_REGION", "HUAWEICLOUD_REGION", "HUAWEI_CLOUD_REGION"); got != "cn-north-4" {
+		t.Fatalf("fallback got %q, want cn-north-4", got)
+	}
+	t.Setenv("HW_REGION", "cn-east-3")
+	if got := envDefaultAliases("cn-north-4", "HW_REGION", "HUAWEICLOUD_REGION", "HUAWEI_CLOUD_REGION"); got != "cn-east-3" {
+		t.Fatalf("first key got %q, want cn-east-3", got)
+	}
+	t.Setenv("HW_REGION", "")
+	t.Setenv("HUAWEI_CLOUD_REGION", "cn-south-1")
+	if got := envDefaultAliases("cn-north-4", "HW_REGION", "HUAWEICLOUD_REGION", "HUAWEI_CLOUD_REGION"); got != "cn-south-1" {
+		t.Fatalf("alias got %q, want cn-south-1", got)
+	}
+}

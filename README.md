@@ -46,11 +46,13 @@ kubectl discovers the plugin because the executable is named `kubectl-cce`.
 
 ## Configure
 
-AK/SK is preferred when both AK and SK are present:
+AK/SK is preferred when both AK and SK are present. Set the `HW_`-prefixed
+variables (`HUAWEICLOUD_` and `HUAWEI_CLOUD_` spellings are accepted as
+aliases):
 
 ```bash
-export HUAWEICLOUD_SDK_AK="your-ak"
-export HUAWEICLOUD_SDK_SK="your-sk"
+export HW_ACCESS_KEY="your-ak"
+export HW_SECRET_KEY="your-sk"
 ```
 
 You can pass the cluster and region directly:
@@ -63,14 +65,14 @@ Or keep them in environment variables:
 
 ```bash
 export CCE_CLUSTER_ID="your-cluster-id"
-export CCE_REGION="cn-north-4"
-export CCE_PROJECT_ID="your-project-id" # optional, but recommended for AK/SK
+export HW_REGION="cn-north-4"
+export HW_PROJECT_ID="your-project-id" # optional, but recommended for AK/SK
 ```
 
 For a temporary AK/SK, also set:
 
 ```bash
-export HUAWEICLOUD_SECURITY_TOKEN="your-security-token"
+export HW_SECURITY_TOKEN="your-security-token"
 ```
 
 If Huawei Cloud returns an AK/SK authentication or signature error, enable
