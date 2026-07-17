@@ -12,6 +12,30 @@ as upstream kubectl.
 
 ## Install
 
+### From GitHub Releases (recommended)
+
+Download the archive for your platform from
+[Releases](https://github.com/pancake0001/kubectl-cce-plugin/releases),
+extract it, and put the binary on your `PATH`. Rename it to `kubectl-cce`
+(`kubectl-cce.exe` on Windows) so kubectl can discover it.
+
+| OS | Arch | Archive |
+| --- | --- | --- |
+| Linux | amd64 | `kubectl-cce_<version>_linux_amd64.tar.gz` |
+| Linux | arm64 | `kubectl-cce_<version>_linux_arm64.tar.gz` |
+| Windows | amd64 | `kubectl-cce_<version>_windows_amd64.zip` |
+| Windows | arm64 | `kubectl-cce_<version>_windows_arm64.zip` |
+
+```bash
+tar -xzf kubectl-cce_*_linux_amd64.tar.gz
+chmod +x kubectl-cce
+mv kubectl-cce /usr/local/bin/
+kubectl plugin list
+kubectl cce --version
+```
+
+### From source
+
 ```bash
 go build -o kubectl-cce ./cmd/kubectl-cce
 export PATH="$PWD:$PATH"
