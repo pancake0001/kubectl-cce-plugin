@@ -70,10 +70,9 @@ func run(args []string, stdout io.Writer) error {
 	printProxyURL := fs.Bool("print-proxy-url", false, "print a temporary local proxy URL and exit")
 	insecureTLS := fs.Bool("cce-insecure-upstream-tls", false, "skip TLS verification for the upstream CCE endpoint")
 	clusterID := fs.String("cluster-id", "", "CCE cluster ID; overrides CCE_CLUSTER_ID")
-	clusterAlias := fs.String("cluster", "", "alias of --cluster-id")
-	region := fs.String("region", "", "Huawei Cloud region; overrides CCE_REGION")
+	region := fs.String("region", "", "Huawei Cloud region; overrides HW_REGION")
 	endpoint := fs.String("endpoint", "", "CCE API Gateway endpoint host; overrides CCE_ENDPOINT")
-	projectID := fs.String("project-id", "", "Huawei Cloud project ID; overrides CCE_PROJECT_ID")
+	projectID := fs.String("project-id", "", "Huawei Cloud project ID; overrides HW_PROJECT_ID")
 	showVersion := fs.Bool("version", false, "print the kubectl-cce version and exit")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -85,9 +84,6 @@ func run(args []string, stdout io.Writer) error {
 
 	cfg := loadConfig()
 	cfg.insecureTLS = *insecureTLS
-	if *clusterID == "" {
-		*clusterID = *clusterAlias
-	}
 	cfg.applyCLIOverrides(*clusterID, *region, *endpoint, *projectID)
 	if err := cfg.validate(); err != nil {
 		return err
@@ -118,12 +114,12 @@ func run(args []string, stdout io.Writer) error {
 func loadConfig() config {
 	cfg := config{
 		clusterID:     cleanEnvValue(os.Getenv("CCE_CLUSTER_ID")),
-		region:        envDefault("CCE_REGION", defaultRegion),
+		region:        envDefaultAliases(defaultRegion, "HW_REGION", "HUAWEICLOUD_REGION", "HUAWEI_CLOUD_REGION"),
 		endpoint:      cleanEnvValue(os.Getenv("CCE_ENDPOINT")),
-		projectID:     firstEnv("CCE_PROJECT_ID", "HUAWEICLOUD_PROJECT_ID", "HUAWEI_CLOUD_PROJECT_ID", "HW_PROJECT_ID", "OS_PROJECT_ID"),
-		ak:            firstEnv("HUAWEICLOUD_SDK_AK", "HUAWEI_CLOUD_AK", "HW_ACCESS_KEY"),
-		sk:            firstEnv("HUAWEICLOUD_SDK_SK", "HUAWEI_CLOUD_SK", "HW_SECRET_KEY"),
-		securityToken: firstEnv("HUAWEICLOUD_SECURITY_TOKEN", "HUAWEI_CLOUD_SECURITY_TOKEN", "HW_SECURITY_TOKEN"),
+		projectID:     firstEnv("HW_PROJECT_ID", "HUAWEICLOUD_PROJECT_ID", "HUAWEI_CLOUD_PROJECT_ID"),
+		ak:            firstEnv("HW_ACCESS_KEY", "HUAWEICLOUD_SDK_AK", "HUAWEI_CLOUD_AK"),
+		sk:            firstEnv("HW_SECRET_KEY", "HUAWEICLOUD_SDK_SK", "HUAWEI_CLOUD_SK"),
+		securityToken: firstEnv("HW_SECURITY_TOKEN", "HUAWEICLOUD_SECURITY_TOKEN", "HUAWEI_CLOUD_SECURITY_TOKEN"),
 		iamToken:      os.Getenv("HUAWEI_IAM_TOKEN"),
 		kubectl:       envDefault("KUBECTL_BIN", "kubectl"),
 		debug:         os.Getenv("CCE_PROXY_DEBUG") != "",
@@ -144,7 +140,7 @@ func (c config) validate() error {
 	if c.iamToken != "" {
 		return nil
 	}
-	return errors.New("set HUAWEICLOUD_SDK_AK and HUAWEICLOUD_SDK_SK, or set HUAWEI_IAM_TOKEN")
+	return errors.New("set HW_ACCESS_KEY and HW_SECRET_KEY, or set HUAWEI_IAM_TOKEN")
 }
 
 func (c config) upstreamHost() string {
@@ -519,6 +515,15 @@ func removeHopByHopHeaders(header http.Header) {
 func envDefault(key, fallback string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return fallback
+}
+
+func envDefaultAliases(fallback string, keys ...string) string {
+	for _, key := range keys {
+		if value := os.Getenv(key); value != "" {
+			return cleanEnvValue(value)
+		}
 	}
 	return fallback
 }

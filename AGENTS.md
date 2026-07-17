@@ -41,8 +41,8 @@ Runtime flow: parse flags -> load config from env -> start HTTP proxy on
 - **Blocked streaming commands**: `exec`, `attach`, `port-forward` are
   rejected by `unsupportedStreamingCommands` in `main.go` because the CCE
   API Gateway does not pass websocket/SPDY upgrades.
-- **Auth precedence**: AK/SK signing is used when both
-  `HUAWEICLOUD_SDK_AK` and `HUAWEICLOUD_SDK_SK` are set; otherwise the
-  plugin falls back to `HUAWEI_IAM_TOKEN` (`X-Auth-Token`). Set
-  `CCE_PROXY_DEBUG=1` to dump the canonical request + string-to-sign to
-  stderr.
+- **Auth precedence**: AK/SK signing is used when both `HW_ACCESS_KEY` and
+  `HW_SECRET_KEY` are set (`HUAWEICLOUD_`/`HUAWEI_CLOUD_` spellings are
+  accepted as aliases); otherwise the plugin falls back to
+  `HUAWEI_IAM_TOKEN` (`X-Auth-Token`). Set `CCE_PROXY_DEBUG=1` to dump the
+  canonical request + string-to-sign to stderr.
