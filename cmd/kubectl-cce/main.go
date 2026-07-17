@@ -37,6 +37,8 @@ var unsupportedStreamingCommands = map[string]bool{
 	"port-forward": true,
 }
 
+var version = "dev"
+
 type config struct {
 	clusterID     string
 	region        string
@@ -52,7 +54,7 @@ type config struct {
 }
 
 func main() {
-	if err := run(os.Args[1:]); err != nil {
+	if err := run(os.Args[1:], os.Stdout); err != nil {
 		var exitErr kubectlExitError
 		if errors.As(err, &exitErr) {
 			os.Exit(exitErr.code)
@@ -62,7 +64,7 @@ func main() {
 	}
 }
 
-func run(args []string) error {
+func run(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("kubectl cce", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	printProxyURL := fs.Bool("print-proxy-url", false, "print a temporary local proxy URL and exit")
@@ -72,8 +74,13 @@ func run(args []string) error {
 	region := fs.String("region", "", "Huawei Cloud region; overrides CCE_REGION")
 	endpoint := fs.String("endpoint", "", "CCE API Gateway endpoint host; overrides CCE_ENDPOINT")
 	projectID := fs.String("project-id", "", "Huawei Cloud project ID; overrides CCE_PROJECT_ID")
+	showVersion := fs.Bool("version", false, "print the kubectl-cce version and exit")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *showVersion {
+		fmt.Fprintln(stdout, version)
+		return nil
 	}
 
 	cfg := loadConfig()

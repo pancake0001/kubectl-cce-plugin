@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -80,5 +82,15 @@ func TestCanonicalQuerySortsKeysAndValues(t *testing.T) {
 	want := "a=x&a=z&b=2"
 	if got != want {
 		t.Fatalf("canonicalQuery() = %q, want %q", got, want)
+	}
+}
+
+func TestVersionFlagPrintsAndExits(t *testing.T) {
+	var stdout bytes.Buffer
+	if err := run([]string{"--version"}, &stdout); err != nil {
+		t.Fatalf("run(--version) err = %v", err)
+	}
+	if got := strings.TrimSpace(stdout.String()); got != version {
+		t.Fatalf("version output = %q, want %q", got, version)
 	}
 }
