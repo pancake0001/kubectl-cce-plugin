@@ -58,7 +58,7 @@ export HW_SECRET_KEY="your-sk"
 You can pass the cluster and region directly:
 
 ```bash
-kubectl cce --cluster your-cluster-id --region cn-north-4 get ns
+kubectl cce --cluster-id your-cluster-id --region cn-north-4 get ns
 ```
 
 Or keep them in environment variables:
@@ -99,7 +99,7 @@ export CCE_ENDPOINT="your-cluster-id.cce.cn-north-4.myhuaweicloud.com"
 
 ```bash
 kubectl cce get pods -n default
-kubectl cce --cluster your-cluster-id --region cn-north-4 get ns
+kubectl cce --cluster-id your-cluster-id --region cn-north-4 get ns
 kubectl cce get pods -A
 kubectl cce get ns
 kubectl cce get nodes

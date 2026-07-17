@@ -70,7 +70,6 @@ func run(args []string, stdout io.Writer) error {
 	printProxyURL := fs.Bool("print-proxy-url", false, "print a temporary local proxy URL and exit")
 	insecureTLS := fs.Bool("cce-insecure-upstream-tls", false, "skip TLS verification for the upstream CCE endpoint")
 	clusterID := fs.String("cluster-id", "", "CCE cluster ID; overrides CCE_CLUSTER_ID")
-	clusterAlias := fs.String("cluster", "", "alias of --cluster-id")
 	region := fs.String("region", "", "Huawei Cloud region; overrides HW_REGION")
 	endpoint := fs.String("endpoint", "", "CCE API Gateway endpoint host; overrides CCE_ENDPOINT")
 	projectID := fs.String("project-id", "", "Huawei Cloud project ID; overrides HW_PROJECT_ID")
@@ -85,9 +84,6 @@ func run(args []string, stdout io.Writer) error {
 
 	cfg := loadConfig()
 	cfg.insecureTLS = *insecureTLS
-	if *clusterID == "" {
-		*clusterID = *clusterAlias
-	}
 	cfg.applyCLIOverrides(*clusterID, *region, *endpoint, *projectID)
 	if err := cfg.validate(); err != nil {
 		return err
