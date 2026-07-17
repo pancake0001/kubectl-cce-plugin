@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 )
@@ -92,5 +93,27 @@ func TestVersionFlagPrintsAndExits(t *testing.T) {
 	}
 	if got := strings.TrimSpace(stdout.String()); got != version {
 		t.Fatalf("version output = %q, want %q", got, version)
+	}
+}
+
+func TestTempKubeconfigValidAndCrossPlatform(t *testing.T) {
+	path, cleanup, err := tempKubeconfigPath()
+	if err != nil {
+		t.Fatalf("tempKubeconfigPath() err = %v", err)
+	}
+	if path == "" {
+		t.Fatal("tempKubeconfigPath() returned empty path")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read temp kubeconfig: %v", err)
+	}
+	want := "apiVersion: v1\nkind: Config\n"
+	if string(data) != want {
+		t.Fatalf("kubeconfig content = %q, want %q", string(data), want)
+	}
+	cleanup()
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("cleanup did not remove %s: %v", path, err)
 	}
 }

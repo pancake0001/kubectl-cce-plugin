@@ -425,11 +425,40 @@ func canonicalHeaders(req *http.Request, signerHeaders string) string {
 	return b.String()
 }
 
+func tempKubeconfigPath() (string, func(), error) {
+	f, err := os.CreateTemp("", "kubectl-cce-kubeconfig-*")
+	if err != nil {
+		return "", nil, err
+	}
+	if _, err := f.WriteString("apiVersion: v1\nkind: Config\n"); err != nil {
+		f.Close()
+		os.Remove(f.Name())
+		return "", nil, err
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(f.Name())
+		return "", nil, err
+	}
+	path := f.Name()
+	cleanup := func() {
+		if err := os.Remove(path); err != nil && os.Getenv("CCE_PROXY_DEBUG") != "" {
+			fmt.Fprintf(os.Stderr, "kubectl-cce: failed to remove temp kubeconfig %s: %v\n", path, err)
+		}
+	}
+	return path, cleanup, nil
+}
+
 func runKubectlThroughProxy(proxy *localProxy, cfg config, kubectlArgs []string) error {
+	kubeconfigPath, cleanup, err := tempKubeconfigPath()
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
 	args := append([]string{
 		"--server=" + proxy.url(),
 		"--insecure-skip-tls-verify=true",
-		"--kubeconfig=/dev/null",
+		"--kubeconfig=" + kubeconfigPath,
 	}, kubectlArgs...)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
