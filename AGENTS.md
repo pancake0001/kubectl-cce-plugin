@@ -44,5 +44,9 @@ Runtime flow: parse flags -> load config from env -> start HTTP proxy on
 - **Auth precedence**: AK/SK signing is used when both `HW_ACCESS_KEY` and
   `HW_SECRET_KEY` are set (`HUAWEICLOUD_`/`HUAWEI_CLOUD_` spellings are
   accepted as aliases); otherwise the plugin falls back to
-  `HUAWEI_IAM_TOKEN` (`X-Auth-Token`). Set `CCE_PROXY_DEBUG=1` to dump the
-  canonical request + string-to-sign to stderr.
+  `HUAWEI_IAM_TOKEN` (`X-Auth-Token`). CLI flags `--cli-access-key`,
+  `--cli-secret-key`, and `--cli-security-token` override the env vars and
+  are parsed position-independently (may appear anywhere among the kubectl
+  args), so a wrapper without env access can append them. Set
+  `CCE_PROXY_DEBUG=1` to dump the canonical request + string-to-sign to
+  stderr.
