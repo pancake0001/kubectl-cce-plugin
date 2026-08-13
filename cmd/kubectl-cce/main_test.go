@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -133,5 +134,59 @@ func TestEnvDefaultAliases(t *testing.T) {
 	t.Setenv("HUAWEI_CLOUD_REGION", "cn-south-1")
 	if got := envDefaultAliases("cn-north-4", "HW_REGION", "HUAWEICLOUD_REGION", "HUAWEI_CLOUD_REGION"); got != "cn-south-1" {
 		t.Fatalf("alias got %q, want cn-south-1", got)
+	}
+}
+
+func TestParseArgsExtractsCLICredsAnywhere(t *testing.T) {
+	parsed, err := parseArgs([]string{"get", "pods", "-n", "default", "--cli-access-key", "AK", "--cli-secret-key", "SK"})
+	if err != nil {
+		t.Fatalf("parseArgs err = %v", err)
+	}
+	if got := parsed.values["cli-access-key"]; got != "AK" {
+		t.Fatalf("cli-access-key = %q, want AK", got)
+	}
+	if got := parsed.values["cli-secret-key"]; got != "SK" {
+		t.Fatalf("cli-secret-key = %q, want SK", got)
+	}
+	want := []string{"get", "pods", "-n", "default"}
+	if !reflect.DeepEqual(parsed.kubectlArgs, want) {
+		t.Fatalf("kubectlArgs = %v, want %v", parsed.kubectlArgs, want)
+	}
+}
+
+func TestParseArgsHandlesEqualsForm(t *testing.T) {
+	parsed, err := parseArgs([]string{"--cli-access-key=AK", "--cli-secret-key=SK", "get", "pods", "--namespace=foo"})
+	if err != nil {
+		t.Fatalf("parseArgs err = %v", err)
+	}
+	if got := parsed.values["cli-access-key"]; got != "AK" {
+		t.Fatalf("cli-access-key = %q, want AK", got)
+	}
+	if got := parsed.values["cli-secret-key"]; got != "SK" {
+		t.Fatalf("cli-secret-key = %q, want SK", got)
+	}
+	want := []string{"get", "pods", "--namespace=foo"}
+	if !reflect.DeepEqual(parsed.kubectlArgs, want) {
+		t.Fatalf("kubectlArgs = %v, want %v", parsed.kubectlArgs, want)
+	}
+}
+
+func TestParseArgsBoolFlagsPositionIndependent(t *testing.T) {
+	parsed, err := parseArgs([]string{"get", "pods", "--print-proxy-url"})
+	if err != nil {
+		t.Fatalf("parseArgs err = %v", err)
+	}
+	if !parsed.bools["print-proxy-url"] {
+		t.Fatal("print-proxy-url not set")
+	}
+	want := []string{"get", "pods"}
+	if !reflect.DeepEqual(parsed.kubectlArgs, want) {
+		t.Fatalf("kubectlArgs = %v, want %v", parsed.kubectlArgs, want)
+	}
+}
+
+func TestParseArgsMissingValue(t *testing.T) {
+	if _, err := parseArgs([]string{"get", "--cli-access-key"}); err == nil {
+		t.Fatal("expected error for missing value, got nil")
 	}
 }

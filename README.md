@@ -55,6 +55,14 @@ export HW_ACCESS_KEY="your-ak"
 export HW_SECRET_KEY="your-sk"
 ```
 
+Credentials can also be passed as CLI flags, which override the environment
+variables and may appear anywhere in the command line (useful when the
+execution environment cannot set env vars):
+
+```bash
+kubectl cce --cli-access-key your-ak --cli-secret-key your-sk get pods -n default
+```
+
 You can pass the cluster and region directly:
 
 ```bash

@@ -8,7 +8,6 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -18,6 +17,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -64,27 +64,100 @@ func main() {
 	}
 }
 
+var pluginValueFlags = map[string]bool{
+	"cli-access-key":     true,
+	"cli-secret-key":     true,
+	"cli-security-token": true,
+	"cluster-id":         true,
+	"region":             true,
+	"endpoint":           true,
+	"project-id":         true,
+}
+
+var pluginBoolFlags = map[string]bool{
+	"cce-insecure-upstream-tls": true,
+	"print-proxy-url":           true,
+	"version":                   true,
+}
+
+type parsedArgs struct {
+	values      map[string]string
+	bools       map[string]bool
+	kubectlArgs []string
+}
+
+func parseArgs(args []string) (parsedArgs, error) {
+	out := parsedArgs{values: map[string]string{}, bools: map[string]bool{}}
+	i := 0
+	for i < len(args) {
+		a := args[i]
+		if !strings.HasPrefix(a, "-") {
+			out.kubectlArgs = append(out.kubectlArgs, a)
+			i++
+			continue
+		}
+		body := strings.TrimLeft(a, "-")
+		name := body
+		val := ""
+		hasEq := false
+		if eq := strings.IndexByte(body, '='); eq >= 0 {
+			name, val, hasEq = body[:eq], body[eq+1:], true
+		}
+		switch {
+		case pluginValueFlags[name]:
+			if hasEq {
+				out.values[name] = val
+				i++
+				continue
+			}
+			if i+1 >= len(args) {
+				return out, fmt.Errorf("flag --%s requires a value", name)
+			}
+			out.values[name] = args[i+1]
+			i += 2
+			continue
+		case pluginBoolFlags[name]:
+			if hasEq {
+				b, err := strconv.ParseBool(val)
+				if err != nil {
+					return out, fmt.Errorf("invalid boolean value %q for --%s", val, name)
+				}
+				out.bools[name] = b
+			} else {
+				out.bools[name] = true
+			}
+			i++
+			continue
+		}
+		out.kubectlArgs = append(out.kubectlArgs, a)
+		i++
+	}
+	return out, nil
+}
+
 func run(args []string, stdout io.Writer) error {
-	fs := flag.NewFlagSet("kubectl cce", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
-	printProxyURL := fs.Bool("print-proxy-url", false, "print a temporary local proxy URL and exit")
-	insecureTLS := fs.Bool("cce-insecure-upstream-tls", false, "skip TLS verification for the upstream CCE endpoint")
-	clusterID := fs.String("cluster-id", "", "CCE cluster ID; overrides CCE_CLUSTER_ID")
-	region := fs.String("region", "", "Huawei Cloud region; overrides HW_REGION")
-	endpoint := fs.String("endpoint", "", "CCE API Gateway endpoint host; overrides CCE_ENDPOINT")
-	projectID := fs.String("project-id", "", "Huawei Cloud project ID; overrides HW_PROJECT_ID")
-	showVersion := fs.Bool("version", false, "print the kubectl-cce version and exit")
-	if err := fs.Parse(args); err != nil {
+	parsed, err := parseArgs(args)
+	if err != nil {
 		return err
 	}
-	if *showVersion {
+	if parsed.bools["version"] {
 		fmt.Fprintln(stdout, version)
 		return nil
 	}
 
 	cfg := loadConfig()
-	cfg.insecureTLS = *insecureTLS
-	cfg.applyCLIOverrides(*clusterID, *region, *endpoint, *projectID)
+	cfg.insecureTLS = parsed.bools["cce-insecure-upstream-tls"]
+	cfg.applyCLIOverrides(
+		parsed.values["cluster-id"],
+		parsed.values["region"],
+		parsed.values["endpoint"],
+		parsed.values["project-id"],
+	)
+	cfg.applyCLICreds(
+		parsed.values["cli-access-key"],
+		parsed.values["cli-secret-key"],
+		parsed.values["cli-security-token"],
+	)
 	if err := cfg.validate(); err != nil {
 		return err
 	}
@@ -95,20 +168,19 @@ func run(args []string, stdout io.Writer) error {
 	}
 	defer proxy.close(context.Background())
 
-	if *printProxyURL {
+	if parsed.bools["print-proxy-url"] {
 		fmt.Println(proxy.url())
 		return nil
 	}
 
-	kubectlArgs := fs.Args()
-	if len(kubectlArgs) == 0 {
+	if len(parsed.kubectlArgs) == 0 {
 		return errors.New("pass a kubectl command, for example: kubectl cce get pods -n default")
 	}
-	if command := findUnsupportedStreamingCommand(kubectlArgs); command != "" {
+	if command := findUnsupportedStreamingCommand(parsed.kubectlArgs); command != "" {
 		return fmt.Errorf("kubectl %s is not supported in this MVP because it needs a streaming connection", command)
 	}
 
-	return runKubectlThroughProxy(proxy, cfg, kubectlArgs)
+	return runKubectlThroughProxy(proxy, cfg, parsed.kubectlArgs)
 }
 
 func loadConfig() config {
@@ -140,7 +212,7 @@ func (c config) validate() error {
 	if c.iamToken != "" {
 		return nil
 	}
-	return errors.New("set HW_ACCESS_KEY and HW_SECRET_KEY, or set HUAWEI_IAM_TOKEN")
+	return errors.New("set --cli-access-key and --cli-secret-key (or HW_ACCESS_KEY/HW_SECRET_KEY), or set HUAWEI_IAM_TOKEN")
 }
 
 func (c config) upstreamHost() string {
@@ -169,6 +241,18 @@ func (c *config) applyCLIOverrides(clusterID, region, endpoint, projectID string
 	}
 	if projectID != "" {
 		c.projectID = cleanEnvValue(projectID)
+	}
+}
+
+func (c *config) applyCLICreds(accessKey, secretKey, securityToken string) {
+	if accessKey != "" {
+		c.ak = cleanEnvValue(accessKey)
+	}
+	if secretKey != "" {
+		c.sk = cleanEnvValue(secretKey)
+	}
+	if securityToken != "" {
+		c.securityToken = cleanEnvValue(securityToken)
 	}
 }
 
