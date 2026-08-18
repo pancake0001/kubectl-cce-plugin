@@ -15,7 +15,7 @@ Runtime flow: parse flags -> load config from env -> start HTTP proxy on
 
 ## Commands
 
-- Build: `go build -o kubectl-cce ./cmd/kubectl-cce`
+- Build: `CGO_ENABLED=0 go build -trimpath -buildmode=pie -ldflags="-s -w" -o kubectl-cce ./cmd/kubectl-cce`
 - Test: `go test ./...` (one package, no services or fixtures required)
 - Vet: `go vet ./...`
 - Format check: `gofmt -l .`
@@ -33,6 +33,12 @@ Runtime flow: parse flags -> load config from env -> start HTTP proxy on
   `git tag v<ver> && git push origin v<ver>`.
 - No `golangci-lint`; `go vet` + `gofmt` are the local checks.
 - No `go.sum`; the module has zero external runtime dependencies.
+- **Static hardened binaries**: all builds set `CGO_ENABLED=0` (fully static,
+  no glibc dependency on Linux), `-buildmode=pie` (ASLR), and `-trimpath`
+  (reproducible, no build paths). `-linkmode=external` / `-extldflags
+  '-Wl,-z,now'` are intentionally NOT used: they require CGO and would
+  reintroduce glibc, and a static binary has no dynamic GOT for RELRO to
+  bind.
 
 ## Gotchas
 

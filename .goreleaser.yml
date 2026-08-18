@@ -6,6 +6,11 @@ builds:
   - id: kubectl-cce
     main: ./cmd/kubectl-cce
     binary: kubectl-cce
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    buildmode: pie
     ldflags:
       - -s -w -X main.version={{.Version}}
     targets:
