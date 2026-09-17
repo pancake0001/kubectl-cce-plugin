@@ -203,6 +203,9 @@ func loadConfig() config {
 }
 
 func (c config) validate() error {
+	if c.projectID == "" {
+		return errors.New("project id is required: pass --project-id, or set HW_PROJECT_ID (HUAWEICLOUD_PROJECT_ID / HUAWEI_CLOUD_PROJECT_ID are also accepted)")
+	}
 	if c.endpoint == "" && c.clusterID == "" {
 		return errors.New("CCE_CLUSTER_ID is required unless CCE_ENDPOINT is set")
 	}
@@ -338,6 +341,9 @@ func proxyHandler(cfg config) http.Handler {
 			applyAKSKSignature(req, body, cfg)
 		} else {
 			req.Header.Set("X-Auth-Token", cfg.iamToken)
+			if cfg.projectID != "" {
+				req.Header.Set("X-Project-Id", cfg.projectID)
+			}
 			req.Header.Del("Authorization")
 		}
 

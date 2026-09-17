@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"reflect"
 	"strings"
@@ -188,5 +189,59 @@ func TestParseArgsBoolFlagsPositionIndependent(t *testing.T) {
 func TestParseArgsMissingValue(t *testing.T) {
 	if _, err := parseArgs([]string{"get", "--cli-access-key"}); err == nil {
 		t.Fatal("expected error for missing value, got nil")
+	}
+}
+
+func TestValidateRequiresProjectID(t *testing.T) {
+	cfg := config{
+		clusterID: "cluster-x",
+		ak:        "AK",
+		sk:        "SK",
+	}
+	err := cfg.validate()
+	if err == nil {
+		t.Fatal("validate() err = nil, want error for missing project id")
+	}
+	if !strings.Contains(err.Error(), "--project-id") {
+		t.Fatalf("validate() err = %q, want error mentioning --project-id", err)
+	}
+
+	cfg.projectID = "project-y"
+	if err := cfg.validate(); err != nil {
+		t.Fatalf("validate() err = %v, want nil when project id is set", err)
+	}
+}
+
+func TestProxyForwardsProjectIdInIAMPath(t *testing.T) {
+	t.Setenv("HTTP_PROXY", "")
+	t.Setenv("HTTPS_PROXY", "")
+	t.Setenv("http_proxy", "")
+	t.Setenv("https_proxy", "")
+
+	var gotProjectID string
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotProjectID = r.Header.Get("X-Project-Id")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer upstream.Close()
+
+	cfg := config{
+		endpoint:    strings.TrimPrefix(upstream.URL, "https://"),
+		projectID:   "proj-iam-123",
+		iamToken:    "iam-token-abc",
+		insecureTLS: true,
+	}
+	proxySrv := httptest.NewServer(proxyHandler(cfg))
+	defer proxySrv.Close()
+
+	resp, err := http.Get(proxySrv.URL + "/api")
+	if err != nil {
+		t.Fatalf("http get through proxy: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if gotProjectID != "proj-iam-123" {
+		t.Fatalf("upstream X-Project-Id = %q, want proj-iam-123", gotProjectID)
 	}
 }

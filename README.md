@@ -63,10 +63,10 @@ execution environment cannot set env vars):
 kubectl cce --cli-access-key your-ak --cli-secret-key your-sk get pods -n default
 ```
 
-You can pass the cluster and region directly:
+You can pass the cluster, region, and project id directly:
 
 ```bash
-kubectl cce --cluster-id your-cluster-id --region cn-north-4 get ns
+kubectl cce --cluster-id your-cluster-id --region cn-north-4 --project-id your-project-id get ns
 ```
 
 Or keep them in environment variables:
@@ -74,8 +74,14 @@ Or keep them in environment variables:
 ```bash
 export CCE_CLUSTER_ID="your-cluster-id"
 export HW_REGION="cn-north-4"
-export HW_PROJECT_ID="your-project-id" # optional, but recommended for AK/SK
+export HW_PROJECT_ID="your-project-id" # required
 ```
+
+The project id is required for all auth methods. Set it via `HW_PROJECT_ID`
+(`HUAWEICLOUD_PROJECT_ID` / `HUAWEI_CLOUD_PROJECT_ID` are accepted as
+aliases) or the `--project-id` flag; it is sent as the `X-Project-Id` header
+on every upstream request. If it is missing, the plugin exits with an error
+naming `--project-id`.
 
 For a temporary AK/SK, also set:
 
